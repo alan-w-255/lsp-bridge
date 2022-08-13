@@ -11,8 +11,8 @@
 ;;           By: Mingde (Matthew) Zeng
 ;; URL: https://github.com/manateelazycat/lsp-bridge
 ;; Keywords:
-;; Compatibility: emacs-version >= 27
-;; Package-Requires: ((emacs "27") (posframe "1.1.7") (markdown-mode "2.6-dev"))
+;; Compatibility: emacs-version >= 28
+;; Package-Requires: ((emacs "28") (posframe "1.1.7") (markdown-mode "2.6-dev"))
 ;;
 ;; Features that might be required by this library:
 ;;
@@ -310,7 +310,7 @@ Then LSP-Bridge will start by gdb, please send new issue with `*lsp-bridge*' buf
   :type 'string)
 
 (defcustom lsp-bridge-python-lsp-server "pyright"
-  "Default LSP server for Python language, you can choose `pyright' or `jedi'."
+  "Default LSP server for Python language, you can choose `pyright', `jedi', `python-ms'."
   :type 'string)
 
 (defcustom lsp-bridge-tex-lsp-server "texlab"
@@ -357,7 +357,8 @@ Then LSP-Bridge will start by gdb, please send new issue with `*lsp-bridge*' buf
     (d-mode . "serve-d")
     ((fortran-mode f90-mode) . "fortls")
     (nix-mode . "rnix-lsp")
-    (ess-r-mode . "rlanguageserver"))
+    (ess-r-mode . "rlanguageserver")
+    (graphql-mode . "graphql-lsp"))
   "The lang server rule for file mode."
   :type 'cons)
 
@@ -723,28 +724,28 @@ you can customize `lsp-bridge-get-project-path-by-filepath' to return project pa
 (defvar-local lsp-bridge-diagnostic-overlays '())
 
 (defun lsp-bridge-monitor-post-command ()
-  (when lsp-bridge-mode
-    (when (or (eq this-command 'self-insert-command)
-              (eq this-command 'org-self-insert-command))
-      (lsp-bridge-try-completion)))
+  (let ((this-command-string (format "%s" this-command)))
+    (when lsp-bridge-mode
+      (when (member this-command-string '("self-insert-command" "org-self-insert-command"))
+        (lsp-bridge-try-completion)))
 
-  (when  (lsp-bridge-has-lsp-server-p)
-    (unless (equal (point) lsp-bridge-last-position)
-      (unless (eq last-command 'mwheel-scroll)
-        (lsp-bridge-call-file-api "change_cursor" (lsp-bridge--position)))
-      (setq-local lsp-bridge-last-position (point)))
+    (when  (lsp-bridge-has-lsp-server-p)
+      (unless (equal (point) lsp-bridge-last-position)
+        (unless (eq last-command 'mwheel-scroll)
+          (lsp-bridge-call-file-api "change_cursor" (lsp-bridge--position)))
+        (setq-local lsp-bridge-last-position (point)))
 
-    ;; Hide hover tooltip.
-    (if (not (string-prefix-p "lsp-bridge-popup-documentation-scroll" (format "%s" this-command)))
-        (lsp-bridge-hide-doc-tooltip))
+      ;; Hide hover tooltip.
+      (if (not (string-prefix-p "lsp-bridge-popup-documentation-scroll" this-command-string))
+          (lsp-bridge-hide-doc-tooltip))
 
-    ;; Hide diagnostic tooltip.
-    (unless (member (format "%s" this-command) '("lsp-bridge-jump-to-next-diagnostic"
-                                                 "lsp-bridge-jump-to-prev-diagnostic"))
-      (lsp-bridge-hide-diagnostic-tooltip))
+      ;; Hide diagnostic tooltip.
+      (unless (member this-command-string '("lsp-bridge-jump-to-next-diagnostic"
+                                            "lsp-bridge-jump-to-prev-diagnostic"))
+        (lsp-bridge-hide-diagnostic-tooltip))
 
-    ;; Hide signature tooltip.
-    (lsp-bridge-hide-signature-tooltip)))
+      ;; Hide signature tooltip.
+      (lsp-bridge-hide-signature-tooltip))))
 
 (defun lsp-bridge-close-buffer-file ()
   (when (and (lsp-bridge-has-lsp-server-p)
@@ -1028,11 +1029,13 @@ you can customize `lsp-bridge-get-project-path-by-filepath' to return project pa
     (unless (eq last-command 'mwheel-scroll)
       (lsp-bridge-call-file-api "signature_help" (lsp-bridge--position)))))
 
-(defun lsp-bridge-file-apply-edits (filepath edits)
+(defun lsp-bridge-file-apply-edits (filepath edits &optional just-reverse)
+  (if (string-match "^/[A-Za-z]:" filepath)
+      (setq filepath (substring filepath 1)))
   (find-file-noselect filepath)
   (save-excursion
     (find-file filepath)
-    (acm-backend-lsp-apply-text-edits edits))
+    (acm-backend-lsp-apply-text-edits edits just-reverse))
 
   (setq-local lsp-bridge-prohibit-completion t))
 
@@ -1422,8 +1425,17 @@ you can customize `lsp-bridge-get-project-path-by-filepath' to return project pa
     (lsp-bridge-call-file-api "formatting" (symbol-value (lsp-bridge--get-indent-width major-mode)))))
 
 (defun lsp-bridge-code-format-fix (filepath edits)
-  (lsp-bridge-file-apply-edits filepath edits)
-  (message "[LSP-BRIDGE] Complete code formatting."))
+  ;; We need set `inhibit-modification-hooks' to t to avoid GC freeze Emacs.
+  (let ((inhibit-modification-hooks t))
+    ;; Apply code format edits, not sort, just reverse order.
+    (lsp-bridge-file-apply-edits filepath edits t)
+    ;; Save buffer to disk.
+    (basic-save-buffer)
+    ;; Make LSP server update file content form disk.
+    (lsp-bridge-call-file-api "update_file")
+    ;; Notify format complete.
+    (message "[LSP-BRIDGE] Complete code formatting.")
+    ))
 
 (defvar lsp-bridge-english-helper-dict nil)
 
