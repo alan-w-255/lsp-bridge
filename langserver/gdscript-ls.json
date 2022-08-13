@@ -1,0 +1,10 @@
+{
+  "name": "gdscript-ls",
+  "languageId": "gdscript-ls",
+  "command": [
+    "netcat",
+    "127.0.0.1",
+    "6008"
+  ],
+  "settings":{}
+}
