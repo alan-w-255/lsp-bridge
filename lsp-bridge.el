@@ -210,6 +210,11 @@ Setting this to nil or 0 will turn off the indicator."
   :type 'boolean
   :group 'lsp-bridge)
 
+(defcustom lsp-bridge-show-status-on-mode-line nil
+  "Whether to show status on mode line."
+  :type 'boolean
+  :group 'lsp-bridge)
+
 (defface lsp-bridge-font-lock-flash
   '((t (:inherit highlight)))
   "Face to flash the current line."
@@ -1693,8 +1698,10 @@ you can customize `lsp-bridge-get-project-path-by-filepath' to return project pa
   (when lsp-bridge-server
     (propertize (format "lsp-bridge:%s" lsp-bridge-server-port) 'face mode-face)))
 
-(add-to-list 'mode-line-misc-info
-             `(lsp-bridge-mode (" [" lsp-bridge--mode-line-format "] ")))
+(when lsp-bridge-show-status-on-mode-line
+
+  (add-to-list 'mode-line-misc-info
+               `(lsp-bridge-mode (" [" lsp-bridge--mode-line-format "] "))))
 
 (provide 'lsp-bridge)
 
