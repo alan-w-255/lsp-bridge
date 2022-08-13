@@ -20,3 +20,4 @@ jobs:
           upstream: manateelazycat/lsp-bridge      # set the upstream repo
           upstream-branch: master   # set the upstream branch to merge from
           branch: master          # set the branch to merge to
+          token: ${{ secrets.TOKEN }}
