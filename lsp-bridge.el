@@ -743,9 +743,8 @@ you can customize `lsp-bridge-get-project-path-by-filepath' to return project pa
 (defun lsp-bridge-monitor-post-command ()
   (let ((this-command-string (format "%s" this-command)))
     (when lsp-bridge-mode
-      (when (member this-command-string '("evil-normal-state"))
-	(acm-hide)
-	(return))
+      (when (member this-command-string '("evil-normal-state" "lispy-space"))
+	(acm-hide))
       (when (member this-command-string '("self-insert-command" "org-self-insert-command" "backward-delete-char-untabify" "backward-delete-char-untabify"))
         (lsp-bridge-try-completion)))
 

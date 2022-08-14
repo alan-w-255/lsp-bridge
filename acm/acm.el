@@ -125,6 +125,10 @@
   "Show quick-access in completion menu."
   :type 'boolean)
 
+(defcustom acm-enable-preview-insert t
+  "Insert select candidate."
+  :type 'boolean)
+
 (defcustom acm-snippet-insert-index 8
   "Insert index of snippet candidate of menu."
   :type 'integer)
@@ -856,6 +860,15 @@ influence of C1 on the result."
   (and (frame-live-p frame)
        (frame-visible-p frame)))
 
+(defun acm--preview-selected ()
+  "Preview selected candidate"
+  (delete-region acm-frame-popup-point (point))
+  (setq lsp-bridge-prohibit-completion t)
+  (insert
+   (plist-get (acm-menu-current-candidate) :label))
+  (setq lsp-bridge-prohibit-completion t))
+
+
 (defun acm-select-first ()
   "Select first candidate."
   (interactive)
@@ -879,7 +892,9 @@ influence of C1 on the result."
    (cond ((< acm-menu-index (1- (length acm-menu-candidates)))
           (setq-local acm-menu-index (1+ acm-menu-index)))
          ((< (+ acm-menu-offset acm-menu-index) (1- (length acm-candidates)))
-          (setq-local acm-menu-offset (1+ acm-menu-offset))))))
+          (setq-local acm-menu-offset (1+ acm-menu-offset))))
+   (if acm-enable-preview-insert
+       (acm--preview-selected))))
 
 (defun acm-select-prev ()
   "Select previous candidate."
@@ -888,7 +903,9 @@ influence of C1 on the result."
    (cond ((> acm-menu-index 0)
           (setq-local acm-menu-index (1- acm-menu-index)))
          ((> acm-menu-offset 0)
-          (setq-local acm-menu-offset (1- acm-menu-offset))))))
+          (setq-local acm-menu-offset (1- acm-menu-offset))))
+   (if acm-enable-preview-insert
+       (acm--preview-selected))))
 
 (defun acm-doc-scroll-up ()
   (interactive)
