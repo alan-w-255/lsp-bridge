@@ -121,6 +121,10 @@
   "Show icon in completion menu."
   :type 'boolean)
 
+(defcustom acm-enable-select-first-candidate nil
+  "Select the first candidate."
+  :type 'boolean)
+
 (defcustom acm-enable-quick-access nil
   "Show quick-access in completion menu."
   :type 'boolean)
@@ -485,7 +489,9 @@ influence of C1 on the result."
                     (cl-subseq acm-candidates
                                0 (min (length acm-candidates)
                                       acm-menu-length)))
-        (setq-local acm-menu-index (if (zerop (length acm-menu-candidates)) -1 0))
+	(if acm-enable-select-first-candidate
+            (setq-local acm-menu-index (if (zerop (length acm-menu-candidates)) -1 0))
+          (setq-local acm-menu-index -1))
         (setq-local acm-menu-offset 0)
 
         ;; Init colors.
@@ -508,8 +514,7 @@ influence of C1 on the result."
           (acm-create-frame-if-not-exist acm-frame acm-buffer "acm frame")
 
           ;; Render menu.
-          (acm-menu-render menu-old-cache))
-        ))
+          (acm-menu-render menu-old-cache))))
      (t
       (acm-hide)))))
 
