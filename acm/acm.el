@@ -95,6 +95,7 @@
 (require 'acm-backend-elisp)
 (require 'acm-backend-lsp)
 (require 'acm-backend-path)
+(require 'acm-backend-tags)
 (require 'acm-backend-search-words)
 (require 'acm-backend-tempel)
 (require 'acm-backend-telega)
@@ -443,6 +444,7 @@ influence of C1 on the result."
                                (acm-backend-elisp-candidates keyword)
                                (acm-backend-lsp-candidates keyword)
                                (acm-backend-search-words-candidates keyword)
+			       (acm-backend-tags-candidates keyword)
 			       (acm-backend-telega-candidates keyword)))
 
         ;; Don't search snippet if char before keyword is not in `acm-backend-lsp-completion-trigger-characters'.
@@ -620,6 +622,7 @@ influence of C1 on the result."
         ("lsp" (acm-backend-lsp-candidate-expand candidate-info bound-start))
         ("yas" (acm-backend-yas-candidate-expand candidate-info bound-start))
         ("path" (acm-backend-path-candidate-expand candidate-info bound-start))
+        ("tag" (acm-backend-tags-candidate-expand candidate-info bound-start))
         ("search-words" (acm-backend-search-words-candidate-expand candidate-info bound-start))
         ("tempel" (acm-backend-tempel-candidate-expand candidate-info bound-start))
         ("english" (acm-backend-english-candidate-expand candidate-info bound-start))
