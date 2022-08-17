@@ -33,6 +33,6 @@
 (defun acm-backend-telega-candidates (keyword)
   (when (and acm-enable-telega (eq major-mode 'telega-chat-mode))
     (acm-backend-telega-update-items)
-    (acm-candidate-sort-by-prefix keyword acm-backend-telega-items)))
+    acm-backend-telega-items))
 
 (provide 'acm-backend-telega)

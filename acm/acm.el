@@ -446,6 +446,8 @@ influence of C1 on the result."
                                (acm-backend-search-words-candidates keyword)
 			       (acm-backend-tags-candidates keyword)
 			       (acm-backend-telega-candidates keyword)))
+	(setq mode-candidate
+	      (acm-candidate-sort-by-prefix keyword mode-candidates))
 
         ;; Don't search snippet if char before keyword is not in `acm-backend-lsp-completion-trigger-characters'.
         (when (and (boundp 'acm-backend-lsp-completion-trigger-characters))

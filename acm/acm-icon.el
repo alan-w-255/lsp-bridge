@@ -100,6 +100,7 @@
     ("search" . ("material" "feature-search" "#7ac143"))
     ("ctor" . ("material" "cube" "#b84592"))
     ("field" . ("material" "tag" "#ff6c5f"))
+    ("tag" . ("material" "tag" "#ff6c5f"))
     ("variable" . ("material" "variable" "#00b2a9"))
     ("var" . ("material" "application-variable" "#e04646"))
     ("class" . ("material" "alpha-c-circle-outline" "#ef5734"))

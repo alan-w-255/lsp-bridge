@@ -1,16 +1,17 @@
 ;;; Code:
+(defun acm-backend-tags-filter-by-prefix (tag)
+  (string-prefix-p (downcase keyword) (downcase tag)))
+
 (defcustom acm-enable-tags t
   "Popup tag completions when this option is turn on."
   :type 'boolean)
 
 (defun acm-backend-tags-candidates (keyword)
-  (when acm-enable-tags
+  (when (and (length> keyword 1) acm-enable-tags)
     (let* ((candidates (list))
-	   (tags (tags-completion-table (get-buffer-create "*acm-backends-tags-completion-table*"))))
+	   (tags (tags-completion-table)))
       (dolist (tag tags)
-	(when (and
-	       (< (length keyword) (length tag))
-	       (acm-candidate-fuzzy-search keyword tag))
+	(when (acm-backend-tags-filter-by-prefix tag)
 	  (add-to-list 'candidates (list :key tag
 					 :icon "tag"
 					 :label tag
@@ -18,7 +19,7 @@
 					 :annotate (capitalize "tag")
 					 :backend "tag")
 		       t)))
-      (acm-candidate-sort-by-prefix keyword candidates))))
+      candidates)))
 
 (defun acm-backend-tags-candidate-expand (candidate-info bound-start)
   (let* ((tag (plist-get candidate-info :label)))
