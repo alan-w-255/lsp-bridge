@@ -100,6 +100,7 @@
 (require 'acm-backend-tempel)
 (require 'acm-backend-telega)
 (require 'acm-quick-access)
+(require 'acm-history)
 
 ;;; Code:
 
@@ -446,8 +447,6 @@ influence of C1 on the result."
                                (acm-backend-search-words-candidates keyword)
 			       (acm-backend-tags-candidates keyword)
 			       (acm-backend-telega-candidates keyword)))
-	(setq mode-candidate
-	      (acm-candidate-sort-by-prefix keyword mode-candidates))
 
         ;; Don't search snippet if char before keyword is not in `acm-backend-lsp-completion-trigger-characters'.
         (when (and (boundp 'acm-backend-lsp-completion-trigger-characters))
@@ -463,7 +462,8 @@ influence of C1 on the result."
                           tempel-candidates
                           (cl-subseq mode-candidates acm-snippet-insert-index))
                 (append mode-candidates yas-candidates tempel-candidates)
-                ))))
+                ))
+	(setq candidates (acm-history--sort keyword candidates))))
 
     candidates))
 

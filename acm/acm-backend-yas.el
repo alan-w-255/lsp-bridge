@@ -108,8 +108,7 @@
                                        :annotation "Yas-Snippet"
                                        :backend "yas")
                      t))
-      
-      (acm-candidate-sort-by-prefix keyword candidates))))
+      candidates)))
 
 (defun acm-backend-yas-candidate-expand (candidate-info bound-start)
   (delete-region bound-start (point))

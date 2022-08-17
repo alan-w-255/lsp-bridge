@@ -23,8 +23,8 @@
                                           :annotation "Tempel"
                                           :backend "tempel")
                         t))
-         (acm-candidate-sort-by-prefix keyword candidates))))
-         
+         candidates)))
+
 (defun acm-backend-tempel-candidate-expand (candidate-info bound-start)
   (delete-region bound-start (point))
   (tempel-insert (intern-soft (plist-get candidate-info :label))))

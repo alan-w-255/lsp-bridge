@@ -109,7 +109,7 @@
                                                :backend "path")
                              t))))))
 
-      (acm-candidate-sort-by-prefix keyword candidates))))
+      candidates)))
 
 (defun acm-backend-path-candidate-expand (candidate-info bound-start)
   (let* ((keyword (acm-get-input-prefix))
