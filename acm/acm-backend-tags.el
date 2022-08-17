@@ -7,7 +7,10 @@
   :type 'boolean)
 
 (defun acm-backend-tags-candidates (keyword)
-  (when (and (length> keyword 1) acm-enable-tags)
+  (when (and
+	 acm-enable-tags
+	 tags-table-list
+	 (length> keyword 1))
     (let* ((candidates (list))
 	   (tags (tags-completion-table)))
       (dolist (tag tags)
