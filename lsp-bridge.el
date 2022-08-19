@@ -811,6 +811,7 @@ you can customize `lsp-bridge-get-project-path-by-filepath' to return project pa
 
 (defun lsp-bridge-try-confirm ()
   (if (and
+       acm-frame
        acm-enable-preview-insert
        (frame-visible-p acm-frame)
        (lsp-bridge-blank-before-cursor))
