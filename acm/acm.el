@@ -876,7 +876,7 @@ influence of C1 on the result."
   (setq lsp-bridge-prohibit-completion t)
   (insert
    (plist-get (acm-menu-current-candidate) :label))
-  (setq lsp-bridge-prohibit-completion t))
+  (setq lsp-bridge-prohibit-completion nil))
 
 
 (defun acm-select-first ()

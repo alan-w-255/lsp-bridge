@@ -743,9 +743,9 @@ you can customize `lsp-bridge-get-project-path-by-filepath' to return project pa
 (defun lsp-bridge-monitor-post-command ()
   (let ((this-command-string (format "%s" this-command)))
     (when lsp-bridge-mode
-      (when (member this-command-string '("evil-normal-state" "lispy-space"))
+      (when (member this-command-string '("evil-normal-state"))
 	(acm-hide))
-      (when (member this-command-string '("self-insert-command" "org-self-insert-command" "backward-delete-char-untabify" "backward-delete-char-untabify"))
+      (when (member this-command-string '("self-insert-command" "org-self-insert-command" "backward-delete-char-untabify" "backward-delete-char-untabify" "lispy-space"))
         (lsp-bridge-try-completion)))
 
     (when  (lsp-bridge-has-lsp-server-p)
@@ -801,12 +801,32 @@ you can customize `lsp-bridge-get-project-path-by-filepath' to return project pa
   (if lsp-bridge-prohibit-completion
       (setq-local lsp-bridge-prohibit-completion nil)
 
-    ;; Try popup completion frame.
-    (if (cl-every (lambda (pred)
-                    (if (functionp pred) (funcall pred) t))
-                  lsp-bridge-completion-popup-predicates)
-        (acm-update)
-      (acm-hide))))
+    (unless (lsp-bridge-try-confirm)
+      ;; Try popup completion frame.
+      (if (cl-every (lambda (pred)
+                      (if (functionp pred) (funcall pred) t))
+                    lsp-bridge-completion-popup-predicates)
+          (acm-update)
+	(acm-hide)))))
+
+(defun lsp-bridge-try-confirm ()
+  (if (and
+       acm-enable-preview-insert
+       (frame-visible-p acm-frame)
+       (lsp-bridge-blank-before-cursor))
+      (progn
+	(acm-update)
+	(acm-history--insert)
+	(acm-hide)
+	t)))
+
+(defun lsp-bridge-blank-before-cursor ()
+  (not (split-string
+	(buffer-substring-no-properties
+	 (max
+	  (1- (point))
+	  (line-beginning-position))
+	 (point)))))
 
 (defun lsp-bridge-popup-complete ()
   (interactive)
