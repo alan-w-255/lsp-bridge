@@ -487,6 +487,9 @@ influence of C1 on the result."
         ;; Enable acm-mode to inject mode keys.
         (acm-mode 1)
 
+        ;; Use `pre-command-hook' to hide completion menu when command not match `acm-continue-commands'.
+        (add-hook 'pre-command-hook #'acm--pre-command nil 'local)
+
         ;; Init candidates, menu index and offset.
         (setq-local acm-candidates candidates)
         (setq-local acm-menu-candidates
@@ -603,7 +606,10 @@ influence of C1 on the result."
   (acm-doc-hide)
 
   ;; Clean `acm-menu-max-length-cache'.
-  (setq acm-menu-max-length-cache 0))
+  (setq acm-menu-max-length-cache 0)
+
+  ;; Remove hook of `acm--pre-command'.
+  (remove-hook 'pre-command-hook #'acm--pre-command 'local))
 
 (defun acm-cancel-timer (timer)
   `(when ,timer
@@ -613,6 +619,11 @@ influence of C1 on the result."
 (defun acm-doc-hide ()
   (when (frame-live-p acm-doc-frame)
     (make-frame-invisible acm-doc-frame)))
+
+(defun acm--pre-command ()
+  ;; Use `pre-command-hook' to hide completion menu when command match `acm-continue-commands'.
+  (unless (acm-match-symbol-p acm-continue-commands this-command)
+    (acm-hide)))
 
 (defun acm-complete ()
   (interactive)
