@@ -18,7 +18,7 @@ class Completion(Handler):
     def process_request(self, lsp_server, position, char) -> dict:
         self.method_server = lsp_server
         self.method_server_name = self.method_server.server_info["name"]
-        
+
         if char in self.method_server.completion_trigger_characters:
             context = dict(triggerCharacter=char,
                            triggerKind=CompletionTriggerKind.TriggerCharacter.value)
@@ -35,7 +35,7 @@ class Completion(Handler):
 
         if response is not None:
             item_index = 0
-            
+
             for item in response["items"] if "items" in response else response:
                 kind = KIND_MAP[item.get("kind", 0)].lower()
                 label = item["label"]
@@ -52,30 +52,30 @@ class Completion(Handler):
                     "textEdit": item.get("textEdit", None),
                     "server": self.method_server_name
                 }
-                
+
                 sort_dict[key] = item.get("sortText", "")
 
                 if self.file_action.enable_auto_import:
                     candidate["additionalTextEdits"] = item.get("additionalTextEdits", [])
 
                 completion_candidates.append(candidate)
-                
+
                 items[key] = item
-                
-                
+
+
                 item_index += 1
-                
+
             self.file_action.completion_items[self.method_server_name] = items
-                
+
             completion_candidates = sorted(completion_candidates, key=lambda candidate: sort_dict[candidate["key"]])
-            
+
         # Avoid returning too many items to cause Emacs to do GC operation.
         completion_candidates = completion_candidates[:min(len(completion_candidates), self.file_action.completion_items_limit)]
-        
+
         self.file_action.last_completion_candidates[self.method_server_name] = completion_candidates
-        
+
         logger.info("\n--- Completion items number: {}".format(len(completion_candidates)))
-        
+
         if len(completion_candidates) > 0:
             eval_in_emacs("lsp-bridge-record-completion-items",
                           self.file_action.filepath,
