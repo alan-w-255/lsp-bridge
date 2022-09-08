@@ -873,9 +873,7 @@ influence of C1 on the result."
   (delete-region acm-frame-popup-point (point))
   (setq lsp-bridge-prohibit-completion t)
   (insert
-   (plist-get (acm-menu-current-candidate) :label))
-  (setq lsp-bridge-prohibit-completion nil))
-
+   (plist-get (acm-menu-current-candidate) :label)))
 
 (defun acm-select-first ()
   "Select first candidate."
