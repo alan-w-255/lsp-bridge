@@ -794,8 +794,10 @@ you can customize `lsp-bridge-get-project-path-by-filepath' to return project pa
     (lsp-bridge-try-completion)))
 
 (defun lsp-bridge-record-search-words-items (candidates)
-  (setq-local acm-backend-search-words-items candidates)
-  (lsp-bridge-try-completion))
+  (if lsp-bridge-prohibit-completion
+      (setq-local lsp-bridge-prohibit-completion nil)
+    ((setq-local acm-backend-search-words-items candidates)
+     (lsp-bridge-try-completion))))
 
 (defun lsp-bridge-try-completion ()
   (if lsp-bridge-prohibit-completion
