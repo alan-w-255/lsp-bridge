@@ -143,6 +143,10 @@
                  (const orderless-regexp)
                  (const orderless-initialism)))
 
+(defcustom acm-user-backend-list nil
+  "User defined candidate backends"
+  :type '(list function))
+
 (defcustom acm-doc-frame-max-lines 20
   "Max line lines of doc frame."
   :type 'integer)
@@ -448,9 +452,13 @@ influence of C1 on the result."
             (setq yas-candidates (acm-backend-yas-candidates keyword))
             (setq tempel-candidates (acm-backend-tempel-candidates keyword))))
 
-        ;; Insert snippet candidates in first page of menu.
         (setq candidates
               (append mode-candidates yas-candidates tempel-candidates))
+
+	(dolist (user-backend acm-user-backend-list)
+	  (when (functionp user-backend)
+	    (setq candidates (append candidates (funcall user-backend keyword)))))
+
 	(setq candidates (acm-history--sort keyword candidates))))
 
     candidates))
