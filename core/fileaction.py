@@ -158,17 +158,18 @@ class FileAction:
     def try_completion(self, position, before_char, completion_visible):
         # Only send textDocument/completion request when match one of following rules:
         # 1. Character before cursor is match completion trigger characters.
-        # 2. Last completion candidates is empty.
+        # 2. Completion UI is invisible.
+        # 3. Last completion candidates is empty.
         if self.multi_servers:
             for lsp_server in self.multi_servers.values():
-                if self.completion_is_available(lsp_server, before_char):
+                if self.completion_is_available(lsp_server, before_char, completion_visible):
                     if lsp_server.server_info["name"] in self.multi_servers_info["completion"]:
                         self.send_server_request(lsp_server, "completion", lsp_server, position, before_char)
         else:
-            if self.completion_is_available(self.single_server, before_char):
+            if self.completion_is_available(self.single_server, before_char, completion_visible):
                 self.send_server_request(self.single_server, "completion", self.single_server, position, before_char)
 
-    def completion_is_available(self, lsp_server, before_char):
+    def completion_is_available(self, lsp_server, before_char, completion_visible):
         return ((before_char in lsp_server.completion_trigger_characters) or
                 len(self.last_completion_candidates.get(lsp_server.server_info["name"], [])) == 0)
 
