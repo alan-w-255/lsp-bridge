@@ -759,8 +759,11 @@ you can customize `lsp-bridge-get-project-path-by-filepath' to return project pa
           (lsp-bridge-hide-doc-tooltip))
 
       ;; Hide diagnostic tooltip.
-      (unless (member this-command-string '("lsp-bridge-jump-to-next-diagnostic"
-                                            "lsp-bridge-jump-to-prev-diagnostic"))
+      (unless (member
+	       this-command-string
+	       '("lsp-bridge-jump-to-next-diagnostic"
+		 "lsp-bridge-jump-to-prev-diagnostic"
+		 "lsp-bridge-show-diagnostic-at-point"))
         (lsp-bridge-hide-diagnostic-tooltip))
 
       ;; Hide signature tooltip.
@@ -1415,6 +1418,15 @@ you can customize `lsp-bridge-get-project-path-by-filepath' to return project pa
                                   lsp-bridge-diagnostic-overlays)))
         (lsp-bridge-show-diagnostic-tooltip diagnostic-overlay)
       (message "[LSP-Bridge] Reach last diagnostic."))))
+
+(defun lsp-bridge-show-diagnostic-at-point ()
+  (interactive)
+  (if-let ((diagnostic-overlay (cl-find-if
+                                (lambda (overlay)
+                                  (lsp-bridge-in-diagnostic-overlay-area-p overlay))
+                                lsp-bridge-diagnostic-overlays)))
+      (lsp-bridge-show-diagnostic-tooltip diagnostic-overlay)
+    (message "[LSP-Bridge] not found diagnostic at point.")))
 
 (defun lsp-bridge-jump-to-prev-diagnostic ()
   (interactive)
