@@ -111,12 +111,23 @@
         (when-let* ((server-items (gethash server-name acm-backend-lsp-items)))
           (maphash (lambda (k v)
                      (let ((candidate-label (plist-get v :label)))
-                       (if (> (length candidate-label) acm-backend-lsp-candidate-max-length)
-                             (plist-put v :display-label (format "%s ..." (substring candidate-label 0 acm-backend-lsp-candidate-max-length)))
-                           (plist-put v :display-label candidate-label))
+                       (when (or (string-equal keyword "")
+                                 (acm-candidate-fuzzy-search keyword candidate-label))
 
-                         (plist-put v :backend "lsp")
-                         (add-to-list 'candidates v t)))
+                         ;; Adjust display label.
+                         (plist-put v :display-label
+                                    (cond ((equal server-name "文")
+                                           (plist-get (plist-get v :textEdit) :newText))
+                                          ((> (length candidate-label) acm-backend-lsp-candidate-max-length)
+                                           (format "%s ..." (substring candidate-label 0 acm-backend-lsp-candidate-max-length)))
+                                          (t
+                                           candidate-label)))
+
+                         ;; FIXME: This progn here is to workaround invalid-function error for macros that have function bindings
+                         ;; References: https://debbugs.gnu.org/cgi/bugreport.cgi?bug=46958
+                         (progn
+                           (plist-put v :backend "lsp")
+                           (add-to-list 'candidates v t)))))
                    server-items))))
 
     candidates))
@@ -171,7 +182,7 @@
     ;; Do `additional-text-edits' if return auto-imprt information.
     (when (and acm-backend-lsp-enable-auto-import
                (cl-plusp (length additional-text-edits)))
-      (acm-backend-lsp-apply-text-edits additional-text-edits))))
+      (acm-backend-lsp-apply-text-edits additional-text-edits nil))))
 
 (defun acm-backend-lsp-candidate-fetch-doc (candidate)
   (let* ((key (plist-get candidate :key))
@@ -236,6 +247,9 @@ Doubles as an indicator of snippet support."
       (delete-region start-point end-point)
       (goto-char start-point)
       (insert new-text))))
+
+(defun acm-backend-lsp-clean ()
+  (setq-local acm-backend-lsp-items (make-hash-table :test 'equal)))
 
 (provide 'acm-backend-lsp)
 

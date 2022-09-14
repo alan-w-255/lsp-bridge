@@ -98,6 +98,8 @@
 (require 'acm-backend-search-words)
 (require 'acm-backend-tempel)
 (require 'acm-backend-telega)
+(require 'acm-backend-tabnine)
+(require 'acm-backend-citre)
 (require 'acm-quick-access)
 (require 'acm-history)
 
@@ -150,6 +152,10 @@
 (defcustom acm-doc-frame-max-lines 20
   "Max line lines of doc frame."
   :type 'integer)
+
+(defcustom acm-enable-tabnine-helper nil
+  "Enable tabnine support"
+  :type 'boolean)
 
 (cl-defmacro acm-run-idle-func (timer idle func)
   `(unless ,timer
@@ -351,9 +357,18 @@
                             (eq sym x)
                           (string-match-p x (symbol-name sym))))))
 
+
+(defun acm-get-input-prefix-bound ()
+  (let ((bound (bounds-of-thing-at-point 'symbol)))
+    (when bound
+      (let* ((keyword (buffer-substring-no-properties (car bound) (cdr bound)))
+             (offset (or (string-match "[[:nonascii:]]+" (reverse keyword))
+                         (length keyword))))
+        (cons (- (cdr bound) offset) (cdr bound))))))
+
 (defun acm-get-input-prefix ()
   "Get user input prefix."
-  (let ((bound (bounds-of-thing-at-point 'symbol)))
+  (let ((bound (acm-get-input-prefix-bound)))
     (if bound
         (buffer-substring-no-properties (car bound) (cdr bound))
       "")))
@@ -422,10 +437,16 @@ influence of C1 on the result."
                                 (backward-char (length keyword))
                                 (acm-char-before)))
          (candidates (list))
+         lsp-candidates
          path-candidates
          yas-candidates
+         tabnine-candidates
          tempel-candidates
-         mode-candidates)
+         mode-candidates
+         citre-candidates)
+    (when acm-enable-tabnine-helper
+      (require 'acm-backend-tabnine)
+      (setq tabnine-candidates (acm-backend-tabnine-candidates keyword)))
 
     (if acm-enable-english-helper
         ;; Completion english if option `acm-enable-english-helper' is enable.
@@ -440,21 +461,28 @@ influence of C1 on the result."
           ;; Only show path candidates if prefix is valid path.
           (setq candidates path-candidates)
 
+        (when acm-enable-citre
+          (setq citre-candidates (acm-backend-citre-candidates keyword)))
         ;; Fetch syntax completion candidates.
+        (setq lsp-candidates (acm-backend-lsp-candidates keyword))
         (setq mode-candidates (append
                                (acm-backend-elisp-candidates keyword)
-                               (acm-backend-lsp-candidates keyword)
+                               lsp-candidates
+                               citre-candidates
                                (acm-backend-search-words-candidates keyword)
-			       (acm-backend-telega-candidates keyword)))
+                               (acm-backend-telega-candidates keyword)))
 
-        ;; Don't search snippet if char before keyword is not in `acm-backend-lsp-completion-trigger-characters'.
-        (when (and (boundp 'acm-backend-lsp-completion-trigger-characters))
-          (unless (member char-before-keyword acm-backend-lsp-completion-trigger-characters)
-            (setq yas-candidates (acm-backend-yas-candidates keyword))
-            (setq tempel-candidates (acm-backend-tempel-candidates keyword))))
+        (when (or
+               ;; Show snippet candidates if lsp-candidates length is zero.
+               (zerop (length lsp-candidates))
+               ;; Don't search snippet if char before keyword is not in `acm-backend-lsp-completion-trigger-characters'.
+               (and (boundp 'acm-backend-lsp-completion-trigger-characters)
+                    (not (member char-before-keyword acm-backend-lsp-completion-trigger-characters))))
+          (setq yas-candidates (acm-backend-yas-candidates keyword))
+          (setq tempel-candidates (acm-backend-tempel-candidates keyword)))
 
         (setq candidates
-              (append mode-candidates yas-candidates tempel-candidates))
+              (append mode-candidates yas-candidates tempel-candidates tabnine-candidates))
 
 	(dolist (user-backend acm-user-backend-list)
 	  (when (functionp user-backend)
@@ -466,7 +494,6 @@ influence of C1 on the result."
 	(setq candidates (acm-candidate-sort-by-prefix keyword candidates))
 	;; TODO 添加预览模式下的历史补全添加. 因为预览模式下, 不需要自己输入确认按键, 这样就不知道是不是应该插入历史补全.
 	(setq candidates (acm-history--sort keyword candidates))))
-
     candidates))
 
 (defun acm-update ()
@@ -475,8 +502,7 @@ influence of C1 on the result."
   (let* ((gc-cons-threshold most-positive-fixnum)
          (keyword (acm-get-input-prefix))
          (candidates (acm-update-candidates))
-         (bounds (bounds-of-thing-at-point 'symbol)))
-
+         (bounds (acm-get-input-prefix-bound)))
     (cond
      ;; Hide completion menu if user type first candidate completely.
      ((and (equal (length candidates) 1)
@@ -597,21 +623,32 @@ influence of C1 on the result."
 
 (defun acm-hide ()
   (interactive)
-  ;; Turn off `acm-mode'.
-  (acm-mode -1)
+  (let* ((candidate-info (acm-menu-current-candidate))
+         (backend (plist-get candidate-info :backend)))
+    ;; Turn off `acm-mode'.
+    (acm-mode -1)
 
-  ;; Hide menu frame.
-  (when (frame-live-p acm-frame)
-    (make-frame-invisible acm-frame))
+    ;; Hide menu frame.
+    (when (frame-live-p acm-frame)
+      (make-frame-invisible acm-frame))
 
-  ;; Hide doc frame.
-  (acm-doc-hide)
+    ;; Hide doc frame.
+    (acm-doc-hide)
 
-  ;; Clean `acm-menu-max-length-cache'.
-  (setq acm-menu-max-length-cache 0)
+    ;; Clean `acm-menu-max-length-cache'.
+    (setq acm-menu-max-length-cache 0)
 
-  ;; Remove hook of `acm--pre-command'.
-  (remove-hook 'pre-command-hook #'acm--pre-command 'local))
+    ;; Remove hook of `acm--pre-command'.
+    (remove-hook 'pre-command-hook #'acm--pre-command 'local)
+
+    ;; Clean backend cache.
+    (pcase backend
+      ("lsp" (acm-backend-lsp-clean))
+      ("search-words" (acm-backend-search-words-clean))
+      ("tabnine" (acm-backend-tabnine-clean))
+      ("telega" (acm-backend-telega-clean))
+      ("citre" (acm-backend-citre-clean))
+      )))
 
 (defun acm-cancel-timer (timer)
   `(when ,timer
@@ -640,6 +677,8 @@ influence of C1 on the result."
         ("search-words" (acm-backend-search-words-candidate-expand candidate-info bound-start))
         ("tempel" (acm-backend-tempel-candidate-expand candidate-info bound-start))
         ("english" (acm-backend-english-candidate-expand candidate-info bound-start))
+        ("tabnine" (acm-backend-tabnine-candidate-expand candidate-info bound-start))
+        ("citre" (acm-backend-citre-candidate-expand candidate-info bound-start))
         (_
          (delete-region bound-start (point))
          (insert (plist-get candidate-info :label)))
@@ -647,6 +686,14 @@ influence of C1 on the result."
 
   ;; Hide menu and doc frame after complete candidate.
   (acm-hide))
+
+(defun acm-complete-or-expand-yas-snippet ()
+  "Do complete or expand yasnippet, you need binding this funtion to `<tab>' in `yas-keymap'."
+  (interactive)
+  (if (and (boundp 'acm-frame)
+           (acm-frame-visible-p acm-frame))
+      (acm-complete)
+    (yas-next-field-or-maybe-expand)))
 
 (defun acm-insert-common ()
   "Insert common prefix of menu."
@@ -680,14 +727,17 @@ influence of C1 on the result."
                      acm-menu-candidates)))
 
 (defun acm-menu-render-items (items menu-index)
-  (let ((item-index 0))
+  (let* ((item-index 0)
+         (annotation-not-exits (cl-every (lambda (item) (string-empty-p (plist-get item :annotation))) items)))
     (dolist (v items)
       (let* ((icon (cdr (assoc (downcase (plist-get v :icon)) acm-icon-alist)))
+             (icon-default (cdr (assoc t acm-icon-alist)))
+             (display-icon (if icon icon icon-default))
              (candidate (plist-get v :display-label))
              (annotation (plist-get v :annotation))
              (annotation-text (if annotation annotation ""))
              (item-length (funcall acm-string-width-function annotation-text))
-             (icon-text (if icon (acm-icon-build (nth 0 icon) (nth 1 icon) (nth 2 icon)) ""))
+             (icon-text (acm-icon-build (nth 0 display-icon) (nth 1 display-icon) (nth 2 display-icon)))
              (quick-access-key (nth item-index acm-quick-access-keys))
              candidate-line)
 
@@ -703,15 +753,18 @@ influence of C1 on the result."
                  (if quick-access-key (concat quick-access-key ". ") "   "))
                candidate
                ;; Fill in the blank according to the maximum width, make sure marks align right of menu.
-               (propertize " "
-                           'display
-                           (acm-indent-pixel
-                            (if (equal acm-string-width-function 'string-pixel-width)
-                                (- (+ acm-menu-max-length-cache (* 20 (string-pixel-width " "))) item-length)
-                              (ceiling (* (window-font-width) (- (+ acm-menu-max-length-cache 20) item-length))))))
+               (unless annotation-not-exits
+                 (propertize " "
+                             'display
+                             (acm-indent-pixel
+                              (if (equal acm-string-width-function 'string-pixel-width)
+                                  (- (+ acm-menu-max-length-cache (* 20 (string-pixel-width " "))) item-length)
+                                (ceiling (* (window-font-width) (- (+ acm-menu-max-length-cache 20) item-length)))))))
+               ;; Render annotation color.
                (propertize (format "%s \n" (capitalize annotation-text))
                            'face
-                           (if (equal item-index menu-index) 'acm-select-face 'font-lock-doc-face))))
+                           (if (equal item-index menu-index) 'acm-select-face 'font-lock-doc-face))
+               ))
 
         ;; Render current candidate.
         (when (equal item-index menu-index)
@@ -951,8 +1004,7 @@ influence of C1 on the result."
 
 ;; Emacs 28: Do not show Acm commands with M-X
 (dolist (sym '(acm-hide acm-complete acm-select-first acm-select-last acm-select-next
-               acm-select-prev acm-insert-common acm-doc-scroll-up acm-doc-scroll-down
-               acm-complete-quick-access acm-doc-toggle))
+                        acm-select-prev acm-insert-common acm-doc-scroll-up acm-doc-scroll-down acm-complete-quick-access acm-doc-toggle))
   (put sym 'completion-predicate #'ignore))
 
 (provide 'acm)

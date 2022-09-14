@@ -130,7 +130,8 @@ Setting this to nil or 0 will turn off the indicator."
 
 (defcustom lsp-bridge-completion-stop-commands
   '("undo-tree-undo" "undo-tree-redo"
-    "kill-region" "delete-block-backward")
+    "kill-region" "delete-block-backward"
+    "python-black-buffer" "acm-complete-or-expand-yas-snippet")
   "If last command is match this option, stop popup completion ui."
   :type 'cons
   :group 'lsp-bridge)
@@ -247,6 +248,7 @@ Start discarding off end if gets this big."
                (lsp-bridge-epc-define-method mngr 'get-emacs-var 'lsp-bridge--get-emacs-var-func)
                (lsp-bridge-epc-define-method mngr 'get-emacs-vars 'lsp-bridge--get-emacs-vars-func)
                (lsp-bridge-epc-define-method mngr 'get-project-path 'lsp-bridge--get-project-path-func)
+               (lsp-bridge-epc-define-method mngr 'get-workspace-folder 'lsp-bridge--get-workspace-folder-func)
                (lsp-bridge-epc-define-method mngr 'get-multi-lang-server 'lsp-bridge--get-multi-lang-server-func)
                (lsp-bridge-epc-define-method mngr 'get-single-lang-server 'lsp-bridge--get-single-lang-server-func)
                (lsp-bridge-epc-define-method mngr 'get-emacs-version 'emacs-version)
@@ -335,6 +337,7 @@ Then LSP-Bridge will start by gdb, please send new issue with `*lsp-bridge*' buf
 (defcustom lsp-bridge-single-lang-server-mode-list
   '(
     ((c-mode c++-mode objc-mode) . lsp-bridge-c-lsp-server)
+    (cmake-mode . "cmake-language-server")
     (java-mode . "jdtls")
     (python-mode . lsp-bridge-python-lsp-server)
     (ruby-mode . "solargraph")
@@ -359,6 +362,7 @@ Then LSP-Bridge will start by gdb, please send new issue with `*lsp-bridge*' buf
     (php-mode . "intelephense")
     (yaml-mode . "yaml-language-server")
     (zig-mode . "zls")
+    (org-mode . "wen")
     (dockerfile-mode . "docker-langserver")
     (d-mode . "serve-d")
     ((fortran-mode f90-mode) . "fortls")
@@ -372,12 +376,14 @@ Then LSP-Bridge will start by gdb, please send new issue with `*lsp-bridge*' buf
 (defcustom lsp-bridge-default-mode-hooks
   '(c-mode-hook
     c++-mode-hook
+    cmake-mode-hook
     java-mode-hook
     python-mode-hook
     ruby-mode-hook
     lua-mode-hook
     rust-mode-hook
     rustic-mode-hook
+    erlang-mode-hook
     elixir-mode-hook
     go-mode-hook
     haskell-mode-hook
@@ -418,7 +424,8 @@ Then LSP-Bridge will start by gdb, please send new issue with `*lsp-bridge*' buf
     fortran-mode-hook
     nix-mode-hook
     ess-r-mode-hook
-    gdscript-mode-hook)
+    gdscript-mode-hook
+    verilog-mode-hook)
   "The default mode hook to enable lsp-bridge."
   :type 'list)
 
@@ -431,6 +438,10 @@ Then LSP-Bridge will start by gdb, please send new issue with `*lsp-bridge*' buf
 (defcustom lsp-bridge-get-project-path-by-filepath nil
   "Default use command 'git rev-parse --show-toplevel' get project path,
 you can customize `lsp-bridge-get-project-path-by-filepath' to return project path by give file path.")
+
+(defcustom lsp-bridge-get-workspace-folder nil
+  "In Java, sometimes, we need return same workspace folder for multiple projects,
+you can customize `lsp-bridge-get-workspace-folder' to return workspace folder path by give project path.")
 
 (defvar lsp-bridge-formatting-indent-alist
   '((c-mode                     . c-basic-offset) ; C
@@ -485,6 +496,19 @@ you can customize `lsp-bridge-get-project-path-by-filepath' to return project pa
        (with-current-buffer buffer
          ,@body))))
 
+(cl-defmacro lsp-bridge-save-position (&rest body)
+  "`save-excursion' not enough for LSP code format.
+So we build this macro to restore postion after code format."
+  `(let* ((current-line (line-number-at-pos))
+          (current-column (lsp-bridge--calculate-column))
+          (indent-column (save-excursion
+                           (back-to-indentation)
+                           (lsp-bridge--calculate-column))))
+     ,@body
+     (goto-line current-line)
+     (back-to-indentation)
+     (forward-char (max (- current-column indent-column) 0))))
+
 (defun lsp-bridge-get-match-buffer (filepath)
   (catch 'find-match
     (dolist (buffer (buffer-list))
@@ -497,6 +521,10 @@ you can customize `lsp-bridge-get-project-path-by-filepath' to return project pa
 (defun lsp-bridge--get-project-path-func (filepath)
   (when lsp-bridge-get-project-path-by-filepath
     (funcall lsp-bridge-get-project-path-by-filepath filepath)))
+
+(defun lsp-bridge--get-workspace-folder-func (project-path)
+  (when lsp-bridge-get-workspace-folder
+    (funcall lsp-bridge-get-workspace-folder project-path)))
 
 (defun lsp-bridge--get-multi-lang-server-func (project-path filepath)
   "Get lang server with project path, file path or file extension."
@@ -539,8 +567,8 @@ you can customize `lsp-bridge-get-project-path-by-filepath' to return project pa
   "Get buffer content for lsp. BUFFER-NAME is name eval from (buffer-name)."
   (let* ((buf (get-buffer buffer-name)))
     (if buf
-      (with-current-buffer buf
-        (buffer-substring-no-properties (point-min) (point-max))))))
+        (with-current-buffer buf
+          (buffer-substring-no-properties (point-min) (point-max))))))
 
 (defun lsp-bridge-get-multi-lang-server-by-extension (filepath)
   "Get lang server for file extension."
@@ -783,7 +811,6 @@ you can customize `lsp-bridge-get-project-path-by-filepath' to return project pa
     (setq-local acm-backend-lsp-completion-position position)
     (setq-local acm-backend-lsp-completion-trigger-characters completion-trigger-characters)
     (setq-local acm-backend-lsp-server-names server-names)
-
     (let* ((lsp-items acm-backend-lsp-items)
            (completion-table (make-hash-table :test 'equal)))
       (dolist (item candidates)
@@ -791,7 +818,6 @@ you can customize `lsp-bridge-get-project-path-by-filepath' to return project pa
         (puthash (plist-get item :key) item completion-table))
       (puthash server-name completion-table lsp-items)
       (setq-local acm-backend-lsp-items lsp-items))
-
     (lsp-bridge-try-completion)))
 
 (defun lsp-bridge-record-search-words-items (candidates)
@@ -801,7 +827,6 @@ you can customize `lsp-bridge-get-project-path-by-filepath' to return project pa
 (defun lsp-bridge-try-completion ()
   (if lsp-bridge-prohibit-completion
       (setq-local lsp-bridge-prohibit-completion nil)
-
     (unless (lsp-bridge-try-confirm)
       ;; Try popup completion frame.
       (if (cl-every (lambda (pred)
@@ -848,7 +873,11 @@ you can customize `lsp-bridge-get-project-path-by-filepath' to return project pa
         acm-backend-lsp-filepath
         (string-suffix-p ".vue" acm-backend-lsp-filepath))
    ;; Other language not allowed popup completion in string, it's annoy
-   (not (lsp-bridge-in-string-p))))
+   (not (lsp-bridge-in-string-p))
+   ;; Allow file path completion in string area
+   (ignore-errors
+     (and (thing-at-point 'filename)
+          (file-exists-p (file-name-directory (thing-at-point 'filename)))))))
 
 (defun lsp-bridge-not-in-comment ()
   "Hide completion if cursor in comment area."
@@ -860,7 +889,8 @@ you can customize `lsp-bridge-get-project-path-by-filepath' to return project pa
 
 (defun lsp-bridge-not-follow-complete ()
   "Hide completion if last command is `acm-complete'."
-  (not (eq last-command 'acm-complete)))
+  (or (not (eq last-command 'acm-complete))
+      (member (format "%s" this-command) '("self-insert-command" "org-self-insert-command"))))
 
 (defun lsp-bridge-in-comment-p (&optional state)
   (ignore-errors
@@ -1478,14 +1508,15 @@ you can customize `lsp-bridge-get-project-path-by-filepath' to return project pa
 
 (defun lsp-bridge-code-format-fix (filepath edits)
   ;; We need set `inhibit-modification-hooks' to t to avoid GC freeze Emacs.
-  (let ((inhibit-modification-hooks t))
-    ;; Apply code format edits, not sort, just reverse order.
-    (lsp-bridge-file-apply-edits filepath edits t)
-    ;; Make LSP server update full content.
-    (lsp-bridge-call-file-api "update_file" (buffer-name))
-    ;; Notify format complete.
-    (message "[LSP-BRIDGE] Complete code formatting.")
-    ))
+  (lsp-bridge-save-position
+   (let ((inhibit-modification-hooks t))
+     ;; Apply code format edits, not sort, just reverse order.
+     (lsp-bridge-file-apply-edits filepath edits t)
+     ;; Make LSP server update full content.
+     (lsp-bridge-call-file-api "update_file" (buffer-name))
+     ;; Notify format complete.
+     (message "[LSP-BRIDGE] Complete code formatting.")
+     )))
 
 (defvar lsp-bridge-english-helper-dict nil)
 
@@ -1514,9 +1545,13 @@ you can customize `lsp-bridge-get-project-path-by-filepath' to return project pa
                                menu-items)))))
 
     (let* ((command (plist-get action :command))
-           (edit (plist-get action :edit)))
+           (edit (plist-get action :edit))
+           (arguments (plist-get action :arguments)))
       (cond (edit
              (lsp-bridge-workspace-apply-edit edit))
+            (arguments
+             (dolist (argument arguments)
+               (lsp-bridge-workspace-apply-edit argument)))
             (command
              (let (arguments)
                ;; Pick command and arguments.
@@ -1662,6 +1697,11 @@ you can customize `lsp-bridge-get-project-path-by-filepath' to return project pa
   (evil-add-command-properties #'lsp-bridge-find-def :jump t)
   (evil-add-command-properties #'lsp-bridge-find-references :jump t)
   (evil-add-command-properties #'lsp-bridge-find-impl :jump t))
+
+(with-eval-after-load 'lsp-bridge
+  (when acm-enable-tabnine-helper
+    (require 'acm-backend-tabnine)
+    (acm-backend-tabnine-start-server)))
 
 (defun lsp-bridge--rename-file-advisor (orig-fun &optional arg &rest args)
   (when (and lsp-bridge-mode
