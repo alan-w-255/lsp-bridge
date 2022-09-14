@@ -188,6 +188,7 @@
 
 (defvar acm-menu-number-cache 0)
 (defvar acm-menu-max-length-cache 0)
+(defvar acm-completion-keyword "")
 
 (defvar-local acm-candidates nil)
 (defvar-local acm-menu-candidates nil)
@@ -458,7 +459,12 @@ influence of C1 on the result."
 	(dolist (user-backend acm-user-backend-list)
 	  (when (functionp user-backend)
 	    (setq candidates (append candidates (funcall user-backend keyword)))))
-
+	;; TODO 添加一个类似 narrow 的方法, 过滤不配备或者匹配度低的候选项. 这样就可以让候选框消失, 触发下一次 lsp 补全请求.
+	(setq candidates
+	      (remove-if-not (lambda (candidate)
+			       (acm-candidate-fuzzy-search keyword (plist-get candidate :label))) candidates))
+	(setq candidates (acm-candidate-sort-by-prefix keyword candidates))
+	;; TODO 添加预览模式下的历史补全添加. 因为预览模式下, 不需要自己输入确认按键, 这样就不知道是不是应该插入历史补全.
 	(setq candidates (acm-history--sort keyword candidates))))
 
     candidates))

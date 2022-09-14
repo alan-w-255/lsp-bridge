@@ -1,5 +1,6 @@
 import os
 from enum import Enum
+from rapidfuzz import fuzz
 
 from core.handler import Handler
 from core.utils import *
@@ -32,13 +33,22 @@ class Completion(Handler):
         completion_candidates = []
         sort_dict = {}
         items = {}
+        keyword = get_emacs_var("acm-completion-keyword")
 
         if response is not None:
             item_index = 0
 
             for item in response["items"] if "items" in response else response:
-                kind = KIND_MAP[item.get("kind", 0)].lower()
                 label = item["label"]
+                score = 0.0
+                assert type(keyword) is str
+                if len(keyword) < 3:
+                    score = fuzz.ratio(keyword, label)
+                else:
+                    score = fuzz.partial_ratio(keyword, label)
+                if score < 0.90:
+                    continue
+                kind = KIND_MAP[item.get("kind", 0)].lower()
                 annotation = kind if kind != "" else item.get("detail", "")
                 key = "{},{}".format(item_index, label)
 
@@ -50,10 +60,9 @@ class Completion(Handler):
                     "insertText": item.get('insertText', None),
                     "insertTextFormat": item.get("insertTextFormat", ''),
                     "textEdit": item.get("textEdit", None),
-                    "server": self.method_server_name
+                    "server": self.method_server_name,
+                    "score": score
                 }
-
-                sort_dict[key] = item.get("sortText", "")
 
                 if self.file_action.enable_auto_import:
                     candidate["additionalTextEdits"] = item.get("additionalTextEdits", [])
@@ -67,7 +76,7 @@ class Completion(Handler):
 
             self.file_action.completion_items[self.method_server_name] = items
 
-            completion_candidates = sorted(completion_candidates, key=lambda candidate: sort_dict[candidate["key"]])
+            completion_candidates = sorted(completion_candidates, key=lambda candidate: candidate["score"], reverse=True)
 
         # Avoid returning too many items to cause Emacs to do GC operation.
         completion_candidates = completion_candidates[:min(len(completion_candidates), self.file_action.completion_items_limit)]

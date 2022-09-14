@@ -759,11 +759,9 @@ you can customize `lsp-bridge-get-project-path-by-filepath' to return project pa
           (lsp-bridge-hide-doc-tooltip))
 
       ;; Hide diagnostic tooltip.
-      (unless (member
-	       this-command-string
-	       '("lsp-bridge-jump-to-next-diagnostic"
-		 "lsp-bridge-jump-to-prev-diagnostic"
-		 "lsp-bridge-show-diagnostic-at-point"))
+      (unless (member this-command-string '("lsp-bridge-jump-to-next-diagnostic"
+                                            "lsp-bridge-jump-to-prev-diagnostic"
+					    "lsp-bridge-show-diagnostic-at-point"))
         (lsp-bridge-hide-diagnostic-tooltip))
 
       ;; Hide signature tooltip.
@@ -947,6 +945,7 @@ you can customize `lsp-bridge-get-project-path-by-filepath' to return project pa
   ;; Record last command to `lsp-bridge-last-change-command'.
   (setq lsp-bridge-last-change-command (format "%s" this-command))
 
+  (setq acm-completion-keyword (acm-get-input-prefix))
   (lsp-bridge-call-file-api "change_file"
                             lsp-bridge--before-change-begin-pos
                             lsp-bridge--before-change-end-pos
