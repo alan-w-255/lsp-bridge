@@ -821,8 +821,9 @@ So we build this macro to restore postion after code format."
     (lsp-bridge-try-completion)))
 
 (defun lsp-bridge-record-search-words-items (candidates)
-  (setq-local acm-backend-search-words-items candidates)
-  (lsp-bridge-try-completion))
+  (when lsp-bridge-enable-search-words
+    (setq-local acm-backend-search-words-items candidates)
+    (lsp-bridge-try-completion)))
 
 (defun lsp-bridge-try-completion ()
   (if lsp-bridge-prohibit-completion

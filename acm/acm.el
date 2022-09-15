@@ -947,6 +947,7 @@ influence of C1 on the result."
 
 (defun acm--preview-selected ()
   "Preview selected candidate"
+  (setq lsp-bridge-prohibit-completion t)
   (delete-region acm-frame-popup-point (point))
   (setq lsp-bridge-prohibit-completion t)
   (insert
