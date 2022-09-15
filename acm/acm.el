@@ -116,6 +116,14 @@
   "Continue ACM completion after executing these commands."
   :type '(repeat (choice regexp symbol)))
 
+(defcustom acm-debug-continue-commands nil
+	     "debug acm continue commands"
+	     :type 'boolean)
+
+(defcustom acm-debug-doc nil
+  "debug acm doc"
+  :type 'boolean)
+
 (defcustom acm-enable-doc t
   "Popup documentation automatically when this option is turn on."
   :type 'boolean)
@@ -656,12 +664,14 @@ influence of C1 on the result."
      (setq ,timer nil)))
 
 (defun acm-doc-hide ()
+  (if acm-debug-doc (message "acm-debug-doc: %S" this-command))
   (when (frame-live-p acm-doc-frame)
     (make-frame-invisible acm-doc-frame)))
 
 (defun acm--pre-command ()
   ;; Use `pre-command-hook' to hide completion menu when command match `acm-continue-commands'.
   (unless (acm-match-symbol-p acm-continue-commands this-command)
+    (if acm-debug-continue-commands (message "acm-debug-continue-commands: %S" this-command))
     (acm-hide)))
 
 (defun acm-complete ()
